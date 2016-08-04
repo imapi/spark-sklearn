@@ -224,6 +224,9 @@ class GridSearchCV(BaseSearchCV):
             local_X = X_bc.value
             local_y = y_bc.value
             res = []
+            if parameters is not None:
+                local_estimator.set_params(**parameters)
+            local_estimator.fit(local_X, local_y, **fit_params)
             for (train, test) in local_cv:
                 res.append(fas(local_estimator, local_X, local_y, scorer, train, test, verbose,
                            parameters, fit_params,
@@ -265,8 +268,10 @@ class GridSearchCV(BaseSearchCV):
 
         # Find the best parameters by comparing on the mean validation score:
         # note that `sorted` is deterministic in the way it breaks ties
-        best = sorted(grid_scores, key=lambda x: x.mean_validation_score,
-                      reverse=True)[0]
+        all_params = sorted(grid_scores, key=lambda x: x.mean_validation_score,
+                            reverse=True)
+        best = all_params[0]
+        self.all_params_ = all_params
         self.best_params_ = best.parameters
         self.best_score_ = best.mean_validation_score
 
