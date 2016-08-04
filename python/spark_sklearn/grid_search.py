@@ -202,9 +202,8 @@ class GridSearchCV(BaseSearchCV):
 
         base_estimator = clone(self.estimator)
 
-        param_grid = [(parameters, train, test)
-                      for parameters in parameter_iterable
-                      for (train, test) in cv]
+        param_grid = [parameters
+                      for parameters in parameter_iterable]
         # Because the original python code expects a certain order for the elements, we need to
         # respect it.
         indexed_param_grid = zip(range(len(param_grid)), param_grid)
@@ -219,14 +218,17 @@ class GridSearchCV(BaseSearchCV):
         fas = _fit_and_score
 
         def fun(tup):
-            (index, (parameters, train, test)) = tup
+            (index, parameters) = tup
             local_estimator = clone(base_estimator)
+            local_cv = cv
             local_X = X_bc.value
             local_y = y_bc.value
-            res = fas(local_estimator, local_X, local_y, scorer, train, test, verbose,
-                                  parameters, fit_params,
-                                  return_parameters=True, error_score=error_score)
-            return (index, res)
+            res = []
+            for (train, test) in local_cv:
+                res.append(fas(local_estimator, local_X, local_y, scorer, train, test, verbose,
+                           parameters, fit_params,
+                           return_parameters=True, error_score=error_score))
+            return index, res
         indexed_out0 = dict(par_param_grid.map(fun).collect())
         out = [indexed_out0[idx] for idx in range(len(param_grid))]
 
@@ -234,17 +236,15 @@ class GridSearchCV(BaseSearchCV):
         y_bc.unpersist()
 
         # Out is a list of triplet: score, estimator, n_test_samples
-        n_fits = len(out)
         n_folds = len(cv)
 
         scores = list()
         grid_scores = list()
-        for grid_start in range(0, n_fits, n_folds):
+        for out_item in out:
             n_test_samples = 0
             score = 0
             all_scores = []
-            for this_score, this_n_test_samples, _, parameters in \
-                    out[grid_start:grid_start + n_folds]:
+            for this_score, this_n_test_samples, _, parameters in out_item:
                 all_scores.append(this_score)
                 if self.iid:
                     this_score *= this_n_test_samples
