@@ -226,7 +226,11 @@ class GridSearchCV(BaseSearchCV):
             res = []
             if parameters is not None:
                 local_estimator.set_params(**parameters)
-            local_estimator.fit(local_X, local_y, **fit_params)
+            try:
+                local_estimator.fit(local_X, local_y, **fit_params)
+            except Exception:
+                if error_score == 'raise':
+                    raise
             for (train, test) in local_cv:
                 res.append(fas(local_estimator, local_X, local_y, scorer, train, test, verbose,
                            parameters, fit_params,
