@@ -4,6 +4,7 @@ Class for parallelizing GridSearchCV jobs in scikit-learn
 
 from collections import Sized
 import numpy as np
+import pandas as pd
 
 from sklearn.base import BaseEstimator, is_classifier, clone
 from sklearn.cross_validation import KFold, check_cv, _fit_and_score, _safe_split
@@ -231,8 +232,9 @@ class GridSearchCV(BaseSearchCV):
             except Exception:
                 if error_score == 'raise':
                     raise
+            local_r_X = [pd.DataFrame({'SourceMediaID': [x['SourceMediaID'].iloc[0]]}) for x in local_X]
             for (train, test) in local_cv:
-                res.append(fas(local_estimator, local_X, local_y, scorer, train, test, verbose,
+                res.append(fas(local_estimator, local_r_X, local_y, scorer, train, test, verbose,
                            parameters, fit_params,
                            return_parameters=True, error_score=error_score))
             return index, res

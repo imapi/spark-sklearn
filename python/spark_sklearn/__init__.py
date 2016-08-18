@@ -7,3 +7,5 @@ from udt import CSRVectorUDT
 __all__ = ['Converter', 'CSRVectorUDT', 'GridSearchCV']
 
 csr_matrix.__UDT__ = CSRVectorUDT()
+
+__version__ = '0.1.12'
