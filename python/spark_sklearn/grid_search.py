@@ -63,6 +63,14 @@ class GridSearchCV(BaseSearchCV):
         Specific cross-validation objects can be passed, see
         sklearn.cross_validation module for the list of possible objects.
 
+    prefit : string, default=None
+        Fit the best estimator with the entire dataset before proceeding with the cross-validation
+        this is particularly for performance reasons: to reduce data amount local fold operates on.
+        A primary key for caching should be used as a value,
+        If None no fitting with the entire dataset is done before cross-validation
+
+        The prefitting step, if any, happens on the local machine.
+
     refit : boolean, default=True
         Refit the best estimator with the entire dataset.
         If "False", it is impossible to make predictions using
@@ -151,13 +159,14 @@ class GridSearchCV(BaseSearchCV):
     """
 
     def __init__(self, sc, estimator, param_grid, scoring=None, fit_params=None,
-                 n_jobs=1, iid=True, refit=True, cv=None, verbose=0,
+                 n_jobs=1, iid=True, prefit=None, refit=True, cv=None, verbose=0,
                  pre_dispatch='2*n_jobs', error_score='raise'):
         super(GridSearchCV, self).__init__(
             estimator, scoring, fit_params, n_jobs, iid,
             refit, cv, verbose, pre_dispatch, error_score)
         self.sc = sc
         self.param_grid = param_grid
+        self.prefit = prefit
         _check_param_grid(param_grid)
 
     def fit(self, X, y=None):
@@ -175,9 +184,9 @@ class GridSearchCV(BaseSearchCV):
             None for unsupervised learning.
 
         """
-        return self._fit(X, y, ParameterGrid(self.param_grid))
+        return self._fit(X, y, ParameterGrid(self.param_grid), self.prefit)
 
-    def _fit(self, X, y, parameter_iterable):
+    def _fit(self, X, y, parameter_iterable, prefit=None):
         """Actual fitting,  performing the search over parameters."""
 
         estimator = self.estimator
@@ -227,14 +236,16 @@ class GridSearchCV(BaseSearchCV):
             res = []
             if parameters is not None:
                 local_estimator.set_params(**parameters)
-            try:
-                local_estimator.fit(local_X, local_y, **fit_params)
-            except Exception:
-                if error_score == 'raise':
-                    raise
-            local_r_X = [pd.DataFrame({'SourceMediaID': [x['SourceMediaID'].iloc[0]]}) for x in local_X]
+            if prefit is not None:
+                try:
+                    local_estimator.fit(local_X, local_y, **fit_params)
+                except Exception:
+                    if error_score == 'raise':
+                        raise
+                local_r_X = [pd.DataFrame({prefit: [x[prefit].iloc[0]]}) for x in local_X]
+                local_X = local_r_X
             for (train, test) in local_cv:
-                res.append(fas(local_estimator, local_r_X, local_y, scorer, train, test, verbose,
+                res.append(fas(local_estimator, local_X, local_y, scorer, train, test, verbose,
                            parameters, fit_params,
                            return_parameters=True, error_score=error_score))
             return index, res
